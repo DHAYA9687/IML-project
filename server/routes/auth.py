@@ -1,0 +1,124 @@
+from datetime import datetime, timedelta
+import os
+from fastapi.responses import JSONResponse
+from jose import JWTError, jwt
+from dotenv import load_dotenv
+from pydantic import BaseModel, EmailStr
+from typing import Optional
+from fastapi.security import OAuth2PasswordBearer
+from passlib.context import CryptContext
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+import uuid
+
+from routes.get_user import get_current_user
+
+load_dotenv()
+SECRET_KEY = os.getenv("JWT_SECRET")
+ALGORITHM = os.getenv("ALGORITHM")
+auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+class UserBase(BaseModel):
+    name: str
+    email: EmailStr
+    rollNo: Optional[str] = None
+    department: str = None
+    age: Optional[int] = None
+
+
+class UserCreate(UserBase):
+    password: str
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    department: str
+    password: str
+
+
+class UserOut(UserBase):
+    id: str
+    role : str
+
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+@auth_router.post("/signup", response_model=UserOut)
+async def signup(request: Request, user: UserCreate):
+    db = request.app.database
+    users_collection = db["users"]
+
+    # Check if user exists
+    if users_collection.find_one({"email": user.email}):
+        raise HTTPException(status_code=400, detail="User already exists")
+
+    user_id = str(uuid.uuid4())
+    new_user = {
+        "name": user.name,
+        "email": user.email,
+        "password": get_password_hash(user.password),
+        "department": user.department,
+        "role": "student",
+        "rollNo": user.rollNo,
+        "age": user.age,
+    }
+    users_collection.insert_one(new_user)
+
+    return UserOut(
+        id=user_id,
+        name=user.name,
+        email=user.email,
+        role="student",
+        rollNo=user.rollNo,
+        department=user.department,
+        age=user.age,
+    )
+
+
+@auth_router.post("/login", response_model=dict)  # not UserOut since we add token
+async def login(request: Request, user: UserLogin):
+    db = request.app.database
+    users_collection = db["users"]
+
+    db_user = users_collection.find_one({"email": user.email})
+    if not db_user or not verify_password(user.password, db_user["password"]) or not db_user["department"] == user.department:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+
+    # Prepare user data + token
+    user_data = {
+        "id": str(db_user["_id"]),
+        "name": db_user["name"],
+        "email": db_user["email"],
+        "role": db_user.get("role", "student"),
+        "department": db_user["department"],
+        "rollNo": db_user.get("rollNo"),
+        "age": db_user.get("age"),
+    }
+
+    token = create_access_token({**user_data})
+
+    return {
+        "user": user_data,
+        "access_token": token,
+    }
+
+
+@auth_router.get("/me")
+def read_users_me(current_user: str = Depends(get_current_user)):
+    return {"user": current_user}
+
+
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=30))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
