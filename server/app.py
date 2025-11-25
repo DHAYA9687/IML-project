@@ -54,7 +54,10 @@ async def health_check():
     
 # Include Routers
 from routes.auth import auth_router
+from routes.quiz import quiz_router
+
 app.include_router(auth_router)
+app.include_router(quiz_router)
 
 
 if __name__ == "__main__":
