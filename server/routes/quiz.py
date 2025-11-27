@@ -19,7 +19,7 @@ quiz_router = APIRouter(prefix="/quiz", tags=["Quiz"])
 
 
 def call_gemini(prompt: str):
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-pro:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
 
     headers = {"Content-Type": "application/json"}
 
