@@ -8,6 +8,7 @@ import re
 import requests
 from bson import ObjectId
 from routes.get_user import get_current_user
+from ml_service import predict_student_risk, format_ml_insights_for_gemini
 import os
 from dotenv import load_dotenv
 
@@ -216,6 +217,97 @@ async def submit_quiz_for_review(
                 elif skill_percentage < 50:
                     weaknesses.append(skill)
 
+        # Calculate ML analytics metrics
+        # 1. Overall accuracy
+        overall_accuracy = round(correct_answers / total_questions, 3)
+        
+        # 2. Skill-specific accuracy
+        cognitive_accuracy = 0.0
+        emotional_accuracy = 0.0
+        behavioural_accuracy = 0.0
+        
+        if skill_performance["Cognitive"]["total"] > 0:
+            cognitive_accuracy = round(
+                skill_performance["Cognitive"]["correct"] / skill_performance["Cognitive"]["total"], 
+                2
+            )
+        if skill_performance["Emotional"]["total"] > 0:
+            emotional_accuracy = round(
+                skill_performance["Emotional"]["correct"] / skill_performance["Emotional"]["total"], 
+                2
+            )
+        if skill_performance["Behavioural"]["total"] > 0:
+            behavioural_accuracy = round(
+                skill_performance["Behavioural"]["correct"] / skill_performance["Behavioural"]["total"], 
+                2
+            )
+        
+        # 3. Average time spent per question
+        total_time = sum(answer.timeSpent for answer in quiz_submission.answers)
+        avg_time_spent = round(total_time / total_questions, 1) if total_questions > 0 else 0
+        
+        # 4. Negative coping responses (emotional regulation indicators)
+        negative_coping_keywords = [
+            "yell", "scream", "shout", "angry", "furious", "rage", "tantrum",
+            "give up", "quit", "ignore", "avoid", "worry", "panic", "afraid",
+            "anxious", "nervous", "scared", "cry", "upset", "frustrated"
+        ]
+        
+        negative_coping_responses = 0
+        positive_coping_responses = 0
+        
+        for answer in quiz_submission.answers:
+            question = next(
+                (q for q in quiz_submission.questions if q.id == answer.questionId),
+                None,
+            )
+            
+            if question and question.skillType in ["Emotional", "Behavioural"]:
+                user_answer_lower = answer.answer.lower()
+                
+                # Check if answer contains negative coping keywords
+                if any(keyword in user_answer_lower for keyword in negative_coping_keywords):
+                    negative_coping_responses += 1
+                elif answer.answer != question.correctAnswer:
+                    # Wrong answer on emotional/behavioral question
+                    negative_coping_responses += 1
+                else:
+                    # Correct answer on emotional/behavioral question
+                    positive_coping_responses += 1
+        
+        # Emotional regulation score
+        total_emotional_behavioral = skill_performance["Emotional"]["total"] + skill_performance["Behavioural"]["total"]
+        emotional_regulation_score = 0.0
+        if total_emotional_behavioral > 0:
+            emotional_regulation_score = round(
+                positive_coping_responses / total_emotional_behavioral, 
+                2
+            )
+        
+        # 5. Attention variance (time spent consistency)
+        if len(quiz_submission.answers) > 1:
+            times = [answer.timeSpent for answer in quiz_submission.answers]
+            mean_time = sum(times) / len(times)
+            variance = sum((t - mean_time) ** 2 for t in times) / len(times)
+            attention_variance = round(variance ** 0.5 / mean_time, 2) if mean_time > 0 else 0
+        else:
+            attention_variance = 0.0
+        
+        # ML Training Analytics
+        ml_analytics = {
+            "overall_accuracy": overall_accuracy,
+            "cognitive_accuracy": cognitive_accuracy,
+            "emotional_accuracy": emotional_accuracy,
+            "behavioural_accuracy": behavioural_accuracy,
+            "avg_time_spent": avg_time_spent,
+            "negative_coping_responses": negative_coping_responses,
+            "positive_coping_responses": positive_coping_responses,
+            "emotional_regulation_score": emotional_regulation_score,
+            "attention_variance": attention_variance,
+            "total_questions": total_questions,
+            "total_time_spent": total_time
+        }
+
         # Store submission in database as PENDING review
         submission_data = {
             "userId": current_user["id"],
@@ -233,7 +325,18 @@ async def submit_quiz_for_review(
             "teacherComments": "",
             "recommendations": [],
             "explanation": "",
+            "mlAnalytics": ml_analytics,  # ML training data
         }
+
+        # Generate ML prediction with SHAP and LIME explanations
+        try:
+            ml_prediction = predict_student_risk(submission_data)
+            submission_data["mlPrediction"] = ml_prediction
+            print(f"ML Prediction generated: {ml_prediction['risk_label']} with confidence {ml_prediction['confidence']:.2f}")
+        except Exception as e:
+            print(f"ML prediction failed: {str(e)}")
+            # Continue without ML prediction - teacher can still review manually
+            submission_data["mlPrediction"] = None
 
         result = request.app.database["quiz_submissions"].insert_one(submission_data)
 
@@ -370,12 +473,17 @@ async def teacher_submit_single(
         if not submission:
             raise HTTPException(status_code=404, detail="Submission not found")
 
-        # Generate AI recommendations
+        # Generate AI recommendations with ML insights
         score_percentage = submission["score"]
         correct_answers = submission["correctAnswers"]
         total_questions = submission["totalQuestions"]
         skill_performance = submission["skillPerformance"]
-
+        
+        # Build recommendation prompt with ML insights if available
+        ml_insights_text = ""
+        if submission.get("mlPrediction"):
+            ml_insights_text = format_ml_insights_for_gemini(submission["mlPrediction"])
+        
         recommendation_prompt = f"""
         Based on the following quiz results, provide personalized learning recommendations:
         
@@ -389,9 +497,12 @@ async def teacher_submit_single(
         
         Teacher Comments: {submission.get('teacherComments', 'None')}
         
+        {ml_insights_text}
+        
         Provide:
-        1. 3-5 specific, actionable recommendations for improvement
-        2. A brief explanation of the student's performance pattern
+        1. 3-5 specific, actionable recommendations for improvement that incorporate the ML insights
+        2. A brief explanation of the student's performance pattern considering the risk assessment and feature importance
+        3. Address the key factors identified by SHAP and LIME explanations
         
         Format as JSON:
         {{
@@ -476,11 +587,16 @@ async def teacher_submit_bulk(
                     failed_count += 1
                     continue
 
-                # Generate AI recommendations
+                # Generate AI recommendations with ML insights
                 score_percentage = submission["score"]
                 correct_answers = submission["correctAnswers"]
                 total_questions = submission["totalQuestions"]
                 skill_performance = submission["skillPerformance"]
+                
+                # Build recommendation prompt with ML insights if available
+                ml_insights_text = ""
+                if submission.get("mlPrediction"):
+                    ml_insights_text = format_ml_insights_for_gemini(submission["mlPrediction"])
 
                 recommendation_prompt = f"""
                 Based on the following quiz results, provide personalized learning recommendations:
@@ -495,8 +611,10 @@ async def teacher_submit_bulk(
                 
                 Teacher Comments: {submission.get('teacherComments', 'None')}
                 
+                {ml_insights_text}
+                
                 Provide:
-                1. 3-5 specific, actionable recommendations for improvement
+                1. 3-5 specific, actionable recommendations for improvement that incorporate the ML insights
                 2. A brief explanation of the student's performance pattern
                 
                 Format as JSON:
@@ -565,44 +683,6 @@ async def teacher_submit_bulk(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to bulk submit: {str(e)}")
-
-
-# @quiz_router.get("/results/{user_id}")
-# async def get_quiz_results(
-#     request: Request, user_id: str, current_user: dict = Depends(get_current_user)
-# ):
-#     """
-#     Get all quiz results for a specific user
-#     """
-#     try:
-#         # Ensure user can only access their own results or teacher can access all
-#         if current_user["id"] != user_id and "teacher" not in current_user.get(
-#             "role", []
-#         ):
-#             raise HTTPException(status_code=403, detail="Access denied")
-
-#         results = list(
-#             request.app.database["quiz_submissions"]
-#             .find({"userId": user_id})
-#             .sort("submittedAt", -1)
-#         )
-
-#         # Convert ObjectId to string
-#         for result in results:
-#             result["_id"] = str(result["_id"])
-#             result["submittedAt"] = result["submittedAt"].isoformat()
-
-#         return JSONResponse(
-#             content={"success": True, "results": results}, status_code=200
-#         )
-
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=500, detail=f"Failed to fetch quiz results: {str(e)}"
-#         )
-
 
 @quiz_router.get("/history")
 async def get_user_quiz_history(

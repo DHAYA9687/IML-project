@@ -248,7 +248,7 @@ export function StudentQuiz() {
   }
 
   const quizAttempts = user?.quizAttempts || 0
-  const isQuizDisabled = quizAttempts >= 3
+  const isQuizDisabled = quizAttempts >= 5
   
   if (!quizStarted) {
     return (

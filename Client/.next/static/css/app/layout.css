@@ -33,6 +33,7 @@ font-weight: 100 900;
   :root, :host {
     --color-red-50: oklch(97.1% 0.013 17.38);
     --color-red-100: oklch(93.6% 0.032 17.717);
+    --color-red-200: oklch(88.5% 0.062 18.334);
     --color-red-300: oklch(80.8% 0.114 19.571);
     --color-red-400: oklch(70.4% 0.191 22.216);
     --color-red-500: oklch(63.7% 0.237 25.331);
@@ -55,6 +56,7 @@ font-weight: 100 900;
     --color-yellow-900: oklch(42.1% 0.095 57.708);
     --color-green-50: oklch(98.2% 0.018 155.826);
     --color-green-100: oklch(96.2% 0.044 156.743);
+    --color-green-200: oklch(92.5% 0.084 155.995);
     --color-green-300: oklch(87.1% 0.15 154.449);
     --color-green-500: oklch(72.3% 0.219 149.579);
     --color-green-600: oklch(62.7% 0.194 149.214);
@@ -69,6 +71,7 @@ font-weight: 100 900;
     --color-blue-700: oklch(48.8% 0.243 264.376);
     --color-blue-800: oklch(42.4% 0.199 265.638);
     --color-blue-900: oklch(37.9% 0.146 265.522);
+    --color-purple-600: oklch(55.8% 0.288 302.321);
     --color-pink-500: oklch(65.6% 0.241 354.308);
     --color-gray-50: oklch(98.5% 0.002 247.839);
     --color-gray-100: oklch(96.7% 0.003 264.542);
@@ -308,6 +311,9 @@ font-weight: 100 900;
   .relative {
     position: relative;
   }
+  .sticky {
+    position: sticky;
+  }
   .inset-0 {
     inset: calc(var(--spacing) * 0);
   }
@@ -481,9 +487,6 @@ font-weight: 100 900;
   }
   .mr-2 {
     margin-right: calc(var(--spacing) * 2);
-  }
-  .mb-0 {
-    margin-bottom: calc(var(--spacing) * 0);
   }
   .mb-1 {
     margin-bottom: calc(var(--spacing) * 1);
@@ -1235,6 +1238,9 @@ font-weight: 100 900;
   .border-gray-200 {
     border-color: var(--color-gray-200);
   }
+  .border-gray-400 {
+    border-color: var(--color-gray-400);
+  }
   .border-green-300 {
     border-color: var(--color-green-300);
   }
@@ -1295,6 +1301,9 @@ font-weight: 100 900;
   .bg-blue-50 {
     background-color: var(--color-blue-50);
   }
+  .bg-blue-500 {
+    background-color: var(--color-blue-500);
+  }
   .bg-border {
     background-color: var(--border);
   }
@@ -1307,6 +1316,12 @@ font-weight: 100 900;
       background-color: color-mix(in oklab, var(--card) 50%, transparent);
     }
   }
+  .bg-card\/95 {
+    background-color: var(--card);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--card) 95%, transparent);
+    }
+  }
   .bg-destructive {
     background-color: var(--destructive);
   }
@@ -1316,11 +1331,20 @@ font-weight: 100 900;
   .bg-gray-50 {
     background-color: var(--color-gray-50);
   }
+  .bg-gray-200 {
+    background-color: var(--color-gray-200);
+  }
+  .bg-gray-400 {
+    background-color: var(--color-gray-400);
+  }
   .bg-green-50 {
     background-color: var(--color-green-50);
   }
   .bg-green-100 {
     background-color: var(--color-green-100);
+  }
+  .bg-green-200 {
+    background-color: var(--color-green-200);
   }
   .bg-green-600 {
     background-color: var(--color-green-600);
@@ -1361,6 +1385,15 @@ font-weight: 100 900;
   .bg-red-100 {
     background-color: var(--color-red-100);
   }
+  .bg-red-200 {
+    background-color: var(--color-red-200);
+  }
+  .bg-red-500 {
+    background-color: var(--color-red-500);
+  }
+  .bg-red-600 {
+    background-color: var(--color-red-600);
+  }
   .bg-secondary {
     background-color: var(--secondary);
   }
@@ -1381,6 +1414,12 @@ font-weight: 100 900;
   }
   .bg-yellow-100 {
     background-color: var(--color-yellow-100);
+  }
+  .bg-yellow-200 {
+    background-color: var(--color-yellow-200);
+  }
+  .bg-yellow-600 {
+    background-color: var(--color-yellow-600);
   }
   .bg-gradient-to-br {
     --tw-gradient-position: to bottom right in oklab;
@@ -1717,6 +1756,9 @@ font-weight: 100 900;
   }
   .text-primary-foreground {
     color: var(--primary-foreground);
+  }
+  .text-purple-600 {
+    color: var(--color-purple-600);
   }
   .text-red-500 {
     color: var(--color-red-500);
@@ -3857,11 +3899,6 @@ font-weight: 100 900;
   .sm\:flex {
     @media (width >= 40rem) {
       display: flex;
-    }
-  }
-  .sm\:w-48 {
-    @media (width >= 40rem) {
-      width: calc(var(--spacing) * 48);
     }
   }
   .sm\:w-auto {

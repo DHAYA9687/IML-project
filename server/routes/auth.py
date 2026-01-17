@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import os
 from fastapi.responses import JSONResponse
-from jose import JWTError, jwt
+import jwt
 from dotenv import load_dotenv
 from pydantic import BaseModel, EmailStr
 from typing import Optional
@@ -84,7 +84,7 @@ async def signup(request: Request, user: UserCreate):
     )
 
 
-@auth_router.post("/login", response_model=dict)  # not UserOut since we add token
+@auth_router.post("/login", response_model=dict) # not UserOut since we add token
 async def login(request: Request, user: UserLogin):
     db = request.app.database
     users_collection = db["users"]
@@ -117,6 +117,7 @@ async def login(request: Request, user: UserLogin):
     }
 
 
+
 @auth_router.get("/me")
 def read_users_me(request: Request, current_user: dict = Depends(get_current_user)):
     """
@@ -124,13 +125,13 @@ def read_users_me(request: Request, current_user: dict = Depends(get_current_use
     """
     db = request.app.database
     users_collection = db["users"]
-    
+
     # Fetch fresh user data from database to get updated quizAttempts
     db_user = users_collection.find_one({"email": current_user["email"]})
-    
+
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     user_data = {
         "id": str(db_user["_id"]),
         "name": db_user["name"],
@@ -141,7 +142,7 @@ def read_users_me(request: Request, current_user: dict = Depends(get_current_use
         "age": db_user.get("age"),
         "quizAttempts": db_user.get("quizAttempts", 0),
     }
-    
+
     return {"user": user_data}
 
 

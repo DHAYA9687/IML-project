@@ -88,7 +88,7 @@ export function StudentDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
       {/* Header */}
-      <header className="border-b bg-card/50 backdrop-blur-sm">
+      <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur-sm shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

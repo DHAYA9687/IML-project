@@ -37,6 +37,19 @@ interface QuizSubmission {
   weaknesses: string[]
   recommendations?: string[]
   explanation?: string
+  mlPrediction?: {
+    predicted_risk: number
+    risk_label: string
+    confidence: number
+    probabilities: {
+      low: number
+      medium: number
+      high: number
+    }
+    features: Record<string, number>
+    shap_explanation: Record<string, number>
+    lime_explanation: Record<string, number>
+  }
 }
 
 export function TeacherDashboard() {
@@ -258,7 +271,7 @@ export function TeacherDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
       {/* Header */}
-      <header className="border-b bg-card/50 backdrop-blur-sm">
+      <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur-sm shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -396,6 +409,7 @@ export function TeacherDashboard() {
                         <Checkbox
                           checked={selectedIds.size === filteredSubmissions.length && filteredSubmissions.length > 0}
                           onCheckedChange={toggleSelectAll}
+                          className="border-2 border-gray-400 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                         />
                       </TableHead>
                       <TableHead>Student</TableHead>
@@ -415,6 +429,7 @@ export function TeacherDashboard() {
                             checked={selectedIds.has(submission._id)}
                             onCheckedChange={() => toggleSelection(submission._id)}
                             disabled={submission.status !== "pending_review"}
+                            className="border-2 border-gray-400 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                           />
                         </TableCell>
                         <TableCell>
@@ -616,6 +631,100 @@ export function TeacherDashboard() {
                     </div>
                   </div>
                 </div>
+
+                {selectedSubmission.mlPrediction && (
+                  <div>
+                    <h4 className="font-semibold mb-2 flex items-center gap-2">
+                      <Brain className="h-4 w-4 text-purple-600" />
+                      ML Risk Assessment
+                    </h4>
+                    <Card>
+                      <CardContent className="pt-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-2xl font-bold text-purple-600">
+                              {selectedSubmission.mlPrediction.risk_label}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Confidence: {(selectedSubmission.mlPrediction.confidence * 100).toFixed(1)}%
+                            </div>
+                          </div>
+                          <div className="text-xs space-y-1">
+                            <div className="flex items-center gap-2">
+                              <div className="w-16 bg-green-200 h-2 rounded">
+                                <div 
+                                  className="bg-green-600 h-2 rounded" 
+                                  style={{width: `${selectedSubmission.mlPrediction.probabilities.low * 100}%`}}
+                                />
+                              </div>
+                              <span>Low: {(selectedSubmission.mlPrediction.probabilities.low * 100).toFixed(0)}%</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-16 bg-yellow-200 h-2 rounded">
+                                <div 
+                                  className="bg-yellow-600 h-2 rounded" 
+                                  style={{width: `${selectedSubmission.mlPrediction.probabilities.medium * 100}%`}}
+                                />
+                              </div>
+                              <span>Med: {(selectedSubmission.mlPrediction.probabilities.medium * 100).toFixed(0)}%</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-16 bg-red-200 h-2 rounded">
+                                <div 
+                                  className="bg-red-600 h-2 rounded" 
+                                  style={{width: `${selectedSubmission.mlPrediction.probabilities.high * 100}%`}}
+                                />
+                              </div>
+                              <span>High: {(selectedSubmission.mlPrediction.probabilities.high * 100).toFixed(0)}%</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h5 className="text-sm font-semibold mb-2">SHAP Feature Importance</h5>
+                          <div className="space-y-1">
+                            {Object.entries(selectedSubmission.mlPrediction.shap_explanation)
+                              .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+                              .slice(0, 5)
+                              .map(([feature, value], idx) => (
+                                <div key={idx} className="flex items-center gap-2 text-xs">
+                                  <span className="w-40 truncate">{feature.replace(/_/g, ' ')}</span>
+                                  <div className="flex-1 bg-gray-200 h-2 rounded relative">
+                                    <div 
+                                      className={`absolute h-2 rounded ${value > 0 ? 'bg-red-500' : 'bg-blue-500'}`}
+                                      style={{
+                                        width: `${Math.abs(value) * 100}%`,
+                                        left: value > 0 ? '50%' : `${50 - Math.abs(value) * 100}%`
+                                      }}
+                                    />
+                                    <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gray-400" />
+                                  </div>
+                                  <span className={`w-12 text-right ${value > 0 ? 'text-red-600' : 'text-blue-600'}`}>
+                                    {value > 0 ? '+' : ''}{value.toFixed(3)}
+                                  </span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <h5 className="text-sm font-semibold mb-2">LIME Explanation (Human-Readable Rules)</h5>
+                          <div className="space-y-1 text-xs">
+                            {Object.entries(selectedSubmission.mlPrediction.lime_explanation).map(([rule, weight], idx) => (
+                              <div key={idx} className="flex items-start gap-2">
+                                <div className={`w-1.5 h-1.5 rounded-full mt-1.5 ${weight > 0 ? 'bg-red-500' : 'bg-blue-500'}`} />
+                                <span className="flex-1">{rule}</span>
+                                <span className={`font-semibold ${weight > 0 ? 'text-red-600' : 'text-blue-600'}`}>
+                                  {weight > 0 ? '+' : ''}{weight.toFixed(2)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
 
                 {selectedSubmission.teacherComments && (
                   <div>
