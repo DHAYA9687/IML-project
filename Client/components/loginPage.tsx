@@ -185,7 +185,7 @@ export default function LoginPage() {
       const data = await res.json()
 
       // localStorage.setItem("auth_token", data.access_token);
-      showSuccessToast(isLogin ? "Login successful!" : "Signup successful! Please log in.");
+      showSuccessToast(isLogin ? "Login successful !!!" : "Signup successful !!! Please log in.");
       if (isLogin) {
         await login(data.access_token)
         setFormData({
@@ -374,7 +374,7 @@ export default function LoginPage() {
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
@@ -412,7 +412,7 @@ export default function LoginPage() {
                     });
                     setShowPassword(false);
                   }
-                  } className="text-sm text-primary hover:underline">
+                  } className="text-sm text-primary hover:underline cursor-pointer">
                     {isLogin ? "Don't have an account? Sign Up →" : "Already have an account? Login →"}
                   </button>
                 </div>

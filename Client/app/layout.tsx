@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
 import "./globals.css"
 import { AuthProvider } from "@/components/auth-provider"
+import { Toaster } from "sonner"
 
 export const metadata: Metadata = {
   title: "Interpretable ML Education Platform",
@@ -24,6 +25,7 @@ export default function RootLayout({
         <AuthProvider>
           {children}
         </AuthProvider>
+        <Toaster position="top-right" richColors />
       </body>
     </html>
   )

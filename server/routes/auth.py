@@ -40,7 +40,7 @@ class UserLogin(BaseModel):
 
 class UserOut(UserBase):
     id: str
-    role : str
+    role: str
 
 
 def get_password_hash(password: str) -> str:
@@ -69,6 +69,7 @@ async def signup(request: Request, user: UserCreate):
         "role": "student",
         "rollNo": user.rollNo,
         "age": user.age,
+        "quizAttempts": 0,
     }
     users_collection.insert_one(new_user)
 
@@ -89,9 +90,12 @@ async def login(request: Request, user: UserLogin):
     users_collection = db["users"]
 
     db_user = users_collection.find_one({"email": user.email})
-    if not db_user or not verify_password(user.password, db_user["password"]) or not db_user["department"] == user.department:
+    if (
+        not db_user
+        or not verify_password(user.password, db_user["password"])
+        or not db_user["department"] == user.department
+    ):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
 
     # Prepare user data + token
     user_data = {
@@ -102,6 +106,7 @@ async def login(request: Request, user: UserLogin):
         "department": db_user["department"],
         "rollNo": db_user.get("rollNo"),
         "age": db_user.get("age"),
+        "quizAttempts": db_user.get("quizAttempts", 0),
     }
 
     token = create_access_token({**user_data})
@@ -113,8 +118,31 @@ async def login(request: Request, user: UserLogin):
 
 
 @auth_router.get("/me")
-def read_users_me(current_user: str = Depends(get_current_user)):
-    return {"user": current_user}
+def read_users_me(request: Request, current_user: dict = Depends(get_current_user)):
+    """
+    Get current user info with fresh data from database
+    """
+    db = request.app.database
+    users_collection = db["users"]
+    
+    # Fetch fresh user data from database to get updated quizAttempts
+    db_user = users_collection.find_one({"email": current_user["email"]})
+    
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user_data = {
+        "id": str(db_user["_id"]),
+        "name": db_user["name"],
+        "email": db_user["email"],
+        "role": db_user.get("role", "student"),
+        "department": db_user["department"],
+        "rollNo": db_user.get("rollNo"),
+        "age": db_user.get("age"),
+        "quizAttempts": db_user.get("quizAttempts", 0),
+    }
+    
+    return {"user": user_data}
 
 
 def create_access_token(data: dict, expires_delta: timedelta = None):

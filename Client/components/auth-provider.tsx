@@ -1,7 +1,7 @@
 "use client"
 
 import { id } from "date-fns/locale"
-import toast from "react-hot-toast"
+import { toast } from "sonner"
 import { useRouter } from "next/navigation";
 import React, { createContext, useContext, useEffect, useState } from "react"
 
@@ -14,8 +14,7 @@ interface User {
   rollNo?: string
   class?: string
   age?: number
-
-
+  quizAttempts?: number
 }
 
 interface AuthContextType {
@@ -109,34 +108,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const showSuccessToast = (message: string) => {
     toast.success(message, {
       duration: 4000,
-      position: 'top-right',
     })
   }
 
   const showErrorToast = (message: string) => {
     toast.error(message, {
       duration: 4000,
-      position: 'top-right',
     })
   }
 
   const showLoadingToast = () => {
     toast.loading('Processing your request...', {
       duration: 2000,
-      position: 'top-right',
     })
   }
 
   const showWarningToast = (message: string) => {
-    toast(message, {
-      icon: '⚠️',
+    toast.warning(message, {
       duration: 4000,
-      position: 'top-right',
-      style: {
-        borderRadius: '10px',
-        background: '#f59e0b',
-        color: '#fff',
-      },
     })
   }
 

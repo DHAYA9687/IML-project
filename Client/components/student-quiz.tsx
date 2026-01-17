@@ -4,8 +4,11 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "./auth-provider"
-import { Brain, Heart, Target, Clock, CheckCircle, XCircle, Loader2 } from "lucide-react"
+import { Brain, Heart, Target, Clock, CheckCircle, XCircle, Loader2, AlertCircle } from "lucide-react"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 
@@ -41,12 +44,13 @@ export function StudentQuiz() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationError, setGenerationError] = useState(false)
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
+  const [showConfigDialog, setShowConfigDialog] = useState(false)
   const [quizConfig, setQuizConfig] = useState<QuizConfig>({
-    age: 10,
+    age: user?.age || 10,
     grade: "5",
     learningLevel: "beginner",
     specialNeedType: "None",
-    interests: "animals",
+    interests: "",
     language: "English"
   })
 
@@ -65,53 +69,62 @@ export function StudentQuiz() {
   const generateQuiz = async () => {
     setIsGenerating(true)
     setGenerationError(false)
+    
+    // Auto-set learning level based on quiz attempts
+    const attempts = user?.quizAttempts || 0
+    let learningLevel: "beginner" | "intermediate" | "advanced" = "beginner"
+    if (attempts === 0 || attempts === 1) learningLevel = "beginner"
+    else if (attempts === 2) learningLevel = "intermediate"
+    else if (attempts >= 3) learningLevel = "advanced"
+    
+    const configWithLevel = { ...quizConfig, learningLevel }
+    
     try {
       const prompt = `You are an expert educational psychologist and special education content designer.
+          Create an adaptive quiz to assess a student's cognitive, emotional, and behavioural skills. 
+          The quiz must be suitable for students with special educational needs and should be engaging, simple, and non-stressful.
 
-Create an adaptive quiz to assess a student's cognitive, emotional, and behavioural skills. 
-The quiz must be suitable for students with special educational needs and should be engaging, simple, and non-stressful.
+          Student Details:
+          - Age: ${configWithLevel.age}
+          - Grade: ${configWithLevel.grade}
+          - Learning Level: ${configWithLevel.learningLevel}
+          - Special Need Type: ${configWithLevel.specialNeedType}
+          - Interests: ${configWithLevel.interests}
+          - Preferred Language: ${configWithLevel.language}
 
-Student Details:
-- Age: ${quizConfig.age}
-- Grade: ${quizConfig.grade}
-- Learning Level: ${quizConfig.learningLevel}
-- Special Need Type: ${quizConfig.specialNeedType}
-- Interests: ${quizConfig.interests}
-- Preferred Language: ${quizConfig.language}
+          Quiz Design Requirements:
 
-Quiz Design Requirements:
+          1. Cognitive Skill Assessment:
+            - Include questions to test memory recall, problem-solving, attention span, logical reasoning
+            - Use short and clear instructions
+            - Record response time and accuracy
 
-1. Cognitive Skill Assessment:
-   - Include questions to test memory recall, problem-solving, attention span, logical reasoning
-   - Use short and clear instructions
-   - Record response time and accuracy
+          2. Emotional Skill Assessment:
+            - Include scenario-based questions to evaluate emotional awareness, stress handling, frustration tolerance, mood recognition
+            - Use options like emojis or simple choices
 
-2. Emotional Skill Assessment:
-   - Include scenario-based questions to evaluate emotional awareness, stress handling, frustration tolerance, mood recognition
-   - Use options like emojis or simple choices
+          3. Behavioural Skill Assessment:
+            - Include task-based questions to assess focus consistency, impulse control, task completion ability, reaction style
 
-3. Behavioural Skill Assessment:
-   - Include task-based questions to assess focus consistency, impulse control, task completion ability, reaction style
+          Quiz Format:
+          - Total Questions: 15
+          - Difficulty: Adaptive based on performance
+          - Question Types: Multiple-choice
+          - Provide clear, simple wording and supportive tone
 
-Quiz Format:
-- Total Questions: 12
-- Difficulty: Adaptive based on performance
-- Question Types: Multiple-choice
-- Provide clear, simple wording and supportive tone
-
-Return ONLY a valid JSON array with this exact structure:
-[
-  {
-    "id": 1,
-    "question": "question text",
-    "skillType": "Cognitive",
-    "difficulty": "Easy",
-    "options": ["option1", "option2", "option3", "option4"],
-    "correctAnswer": "option1",
-    "timeLimit": 30,
-    "behaviorIndicator": "Tests memory recall"
-  }
-]`
+          Return ONLY a valid JSON array with this exact structure:
+          [
+            {
+              "id": 1,
+              "question": "question text",
+              "skillType": "Cognitive",
+              "difficulty": "Easy",
+              "options": ["option1", "option2", "option3", "option4"],
+              "correctAnswer": "option1",
+              "timeLimit": 30,
+              "behaviorIndicator": "Tests memory recall"
+            }
+          ]`
 
       const res = await fetch(`${backendURL}/quiz/generate`, {
         method: "POST",
@@ -119,7 +132,7 @@ Return ONLY a valid JSON array with this exact structure:
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem("auth_token")}`
         },
-        body: JSON.stringify({ prompt, config: quizConfig }),
+        body: JSON.stringify({ prompt, config: configWithLevel }),
       })
 
       if (!res.ok) {
@@ -129,8 +142,10 @@ Return ONLY a valid JSON array with this exact structure:
 
       const data = await res.json()
       setQuestions(data.questions)
+      console.log("Quiz questions loaded:", data.questions.length)
       showSuccessToast("Quiz generated successfully!")
     } catch (err: any) {
+      console.error("Quiz generation error:", err)
       setGenerationError(true)
       showErrorToast(err.message || "Failed to generate quiz. Please try again.")
       console.error(err)
@@ -139,14 +154,25 @@ Return ONLY a valid JSON array with this exact structure:
     }
   }
 
-  const handleStartQuiz = async () => {
-    if (questions.length === 0) {
-      setQuizStarted(true)
-      await generateQuiz()
-    } else {
-      setQuizStarted(true)
-      setTimeSpent(0)
+  const handleStartQuiz = () => {
+    console.log("Start Quiz clicked")
+    setShowConfigDialog(true)
+  }
+
+  const handleConfigSubmit = async () => {
+    console.log("Config submit clicked", quizConfig)
+    
+    if (!quizConfig.interests.trim()) {
+      showErrorToast("Please enter your interests")
+      return
     }
+    
+    // Close dialog and start quiz
+    setShowConfigDialog(false)
+    setQuizStarted(true)
+    
+    // Generate quiz
+    await generateQuiz()
   }
 
   const handleAnswerSelect = (option: string) => {
@@ -162,26 +188,18 @@ Return ONLY a valid JSON array with this exact structure:
       timeSpent
     }
 
-    // Wait 1 second to show feedback, then move to next question
-    setTimeout(() => {
-      setAnswers([...answers, newAnswer])
-      setSelectedAnswer("")
-      setAnswerSubmitted(false)
-      setTimeSpent(0)
-
-      if (currentQuestion < questions.length - 1) {
-        setCurrentQuestion(currentQuestion + 1)
-      } else {
-        // Submit quiz with the final answer
-        handleSubmitQuiz([...answers, newAnswer])
-      }
-    }, 1000)
+    setAnswers([...answers, newAnswer])
   }
 
-  const handleSubmitQuiz = async (allAnswers?: { questionId: number; answer: string; timeSpent: number }[]) => {
+  const handleNextQuestion = () => {
+    setSelectedAnswer("")
+    setAnswerSubmitted(false)
+    setTimeSpent(0)
+    setCurrentQuestion(currentQuestion + 1)
+  }
+
+  const handleSubmitQuiz = async () => {
     setQuizCompleted(true)
-    
-    const answersToSubmit = allAnswers || answers
     
     try {
       const res = await fetch(`${backendURL}/quiz/submit`, {
@@ -192,13 +210,16 @@ Return ONLY a valid JSON array with this exact structure:
         },
         body: JSON.stringify({ 
           userId: user?.id,
-          answers: answersToSubmit,
+          answers: answers,
           questions 
         }),
       })
 
       if (res.ok) {
         showSuccessToast("Quiz submitted successfully!")
+      }else{
+        const errorData = await res.json().catch(() => ({ detail: "Failed to submit quiz" }))
+        throw new Error(errorData.detail || "Failed to submit quiz")
       }
     } catch (err) {
       showErrorToast("Failed to submit quiz")
@@ -226,6 +247,9 @@ Return ONLY a valid JSON array with this exact structure:
     }
   }
 
+  const quizAttempts = user?.quizAttempts || 0
+  const isQuizDisabled = quizAttempts >= 3
+  
   if (!quizStarted) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -283,21 +307,138 @@ Return ONLY a valid JSON array with this exact structure:
               </ul>
             </div>
 
+            <div className="bg-blue-50 p-4 rounded-lg flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-blue-600" />
+                <span className="text-sm font-medium">Quiz Attempts: {quizAttempts} / 3</span>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {quizAttempts === 0 && "Beginner Level"}
+                {quizAttempts === 1 && "Beginner Level"}
+                {quizAttempts === 2 && "Intermediate Level"}
+                {quizAttempts >= 3 && "Advanced Level"}
+              </span>
+            </div>
+
+            {isQuizDisabled && (
+              <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-orange-900 mb-1">Maximum Attempts Reached</h4>
+                  <p className="text-sm text-orange-800">
+                    You have completed all 3 quiz attempts. Please check your dashboard for results and recommendations.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <Button 
               onClick={handleStartQuiz} 
-              className="w-full" 
+              className="w-full disabled:bg-gray-400 disabled:text-gray-100 disabled:cursor-not-allowed disabled:opacity-60" 
               size="lg"
-              disabled={isGenerating}
+              type="button"
+              disabled={isGenerating || isQuizDisabled}
             >
               {isGenerating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Generating Your Personalized Quiz...
                 </>
+              ) : isQuizDisabled ? (
+                "Quiz Limit Reached"
               ) : (
                 "Start Quiz"
               )}
             </Button>
+
+            {/* Quiz Configuration Dialog */}
+            <Dialog open={showConfigDialog} onOpenChange={setShowConfigDialog}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Quiz Configuration</DialogTitle>
+                  <DialogDescription>
+                    Tell us a bit about yourself to personalize your quiz experience
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="age">Age</Label>
+                    <Input
+                      id="age"
+                      type="number"
+                      min="5"
+                      max="100"
+                      value={quizConfig.age}
+                      onChange={(e) => setQuizConfig({ ...quizConfig, age: parseInt(e.target.value) || 10 })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="grade">Grade</Label>
+                    <Input
+                      id="grade"
+                      placeholder="e.g., 5, 6, 7"
+                      value={quizConfig.grade}
+                      onChange={(e) => setQuizConfig({ ...quizConfig, grade: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="specialNeed">Special Need (Optional)</Label>
+                    <Select
+                      value={quizConfig.specialNeedType}
+                      onValueChange={(value: any) => setQuizConfig({ ...quizConfig, specialNeedType: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="None">None</SelectItem>
+                        <SelectItem value="ADHD">ADHD</SelectItem>
+                        <SelectItem value="Dyslexia">Dyslexia</SelectItem>
+                        <SelectItem value="Autism">Autism</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="interests">Your Interests *</Label>
+                    <Input
+                      id="interests"
+                      placeholder="e.g., animals, sports, music, science"
+                      value={quizConfig.interests}
+                      onChange={(e) => setQuizConfig({ ...quizConfig, interests: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="language">Preferred Language</Label>
+                    <Select
+                      value={quizConfig.language}
+                      onValueChange={(value: any) => setQuizConfig({ ...quizConfig, language: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="English">English</SelectItem>
+                        <SelectItem value="Tamil">Tamil</SelectItem>
+                        <SelectItem value="Mixed">Mixed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="bg-blue-50 p-3 rounded-lg">
+                    <p className="text-xs text-blue-800">
+                      <strong>Learning Level:</strong> {quizAttempts === 0 || quizAttempts === 1 ? "Beginner" : quizAttempts === 2 ? "Intermediate" : "Advanced"} (Auto-set based on attempts)
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setShowConfigDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="button" onClick={handleConfigSubmit}>
+                    Start Quiz
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
       </div>
@@ -383,7 +524,7 @@ Return ONLY a valid JSON array with this exact structure:
 
             <div className="bg-blue-50 p-4 rounded-lg">
               <p className="text-sm text-center">
-                Your teacher will review your results and provide personalized feedback and recommendations.
+                Your quiz has been submitted for teacher review. Once your teacher reviews and approves it, you'll see the detailed results and AI-powered recommendations in your dashboard.
               </p>
             </div>
 
@@ -394,10 +535,11 @@ Return ONLY a valid JSON array with this exact structure:
                 setCurrentQuestion(0)
                 setAnswers([])
                 setQuestions([])
+                window.location.reload()
               }} 
               className="w-full"
             >
-              Take Another Quiz
+              Back to Dashboard
             </Button>
           </CardContent>
         </Card>
@@ -494,6 +636,20 @@ Return ONLY a valid JSON array with this exact structure:
               )
             })}
           </div>
+
+          {answerSubmitted && (
+            <div className="flex justify-end pt-4">
+              {currentQuestion < questions.length - 1 ? (
+                <Button onClick={handleNextQuestion} size="lg">
+                  Next Question
+                </Button>
+              ) : (
+                <Button onClick={handleSubmitQuiz} size="lg" className="bg-green-600 hover:bg-green-700">
+                  Submit Quiz
+                </Button>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

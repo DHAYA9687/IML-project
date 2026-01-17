@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { useAuth } from "./auth-provider"
 import { StudentQuiz } from "./student-quiz"
-import { TrendingUp, TrendingDown, Brain, Calendar, Award, Target, BookOpen, Loader2 } from "lucide-react"
+import { TrendingUp, TrendingDown, Brain, Calendar, Award, Target, BookOpen, Loader2, Clock } from "lucide-react"
 
 interface QuizResult {
   _id: string
@@ -20,6 +22,8 @@ interface QuizResult {
   recommendations: string[]
   explanation: string
   submittedAt: string
+  status?: string
+  teacherComments?: string
   skillPerformance: {
     Cognitive: { correct: number; total: number }
     Emotional: { correct: number; total: number }
@@ -31,6 +35,7 @@ export function StudentDashboard() {
   const { user, loading, logout } = useAuth()
   const [quizResults, setQuizResults] = useState<QuizResult[]>([])
   const [loadingResults, setLoadingResults] = useState(true)
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const backendURL = process.env.NEXT_PUBLIC_API_URL
 
   useEffect(() => {
@@ -97,7 +102,7 @@ export function StudentDashboard() {
                 </p>
               </div>
             </div>
-            <Button onClick={logout} variant="outline">
+            <Button onClick={() => setShowLogoutDialog(true)} variant="outline">
               Logout
             </Button>
           </div>
@@ -185,7 +190,7 @@ export function StudentDashboard() {
             <div className="grid gap-6">
               {quizResults.map((result) => (
                 <Card key={result._id} className="overflow-hidden">
-                  <CardHeader>
+                  <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <div>
                         <CardTitle className="text-lg">Adaptive Quiz</CardTitle>
@@ -198,59 +203,115 @@ export function StudentDashboard() {
                     </div>
                   </CardHeader>
 
-                  <CardContent className="space-y-6">
-                    {/* Strengths & Weaknesses */}
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <TrendingUp className="h-4 w-4 text-green-600" />
-                          <h4 className="font-semibold text-green-700">Strengths</h4>
+                  <CardContent>
+                    <Accordion type="single" collapsible className="w-full">
+                      <AccordionItem value="details" className="border-0">
+                        <AccordionTrigger className="hover:no-underline py-2 text-sm font-medium">
+                          View Details
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-6 pt-4">
+                    {/* Show pending review message if quiz hasn't been processed */}
+                    {(result.status === "pending_review" || result.status === "reviewed") ? (
+                      <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-lg text-center space-y-3">
+                        <div className="flex items-center justify-center gap-2">
+                          <Clock className="h-5 w-5 text-yellow-600" />
+                          <h4 className="font-semibold text-yellow-900">
+                            {result.status === "pending_review" ? "Pending Teacher Review" : "Under Review"}
+                          </h4>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          {result.strengths.map((strength: string, index: number) => (
-                            <Badge key={index} variant="secondary" className="bg-green-100 text-green-800">
-                              {strength}
-                            </Badge>
-                          ))}
-                        </div>
+                        <p className="text-sm text-yellow-800">
+                          Your teacher is reviewing your quiz submission. You'll receive detailed feedback, 
+                          AI-powered recommendations, and personalized learning suggestions once the review is complete.
+                        </p>
+                        {result.teacherComments && (
+                          <div className="mt-4 bg-white p-4 rounded border border-yellow-200">
+                            <p className="text-xs font-semibold text-yellow-900 mb-2">Teacher's Note:</p>
+                            <p className="text-sm text-gray-700">{result.teacherComments}</p>
+                          </div>
+                        )}
                       </div>
+                    ) : (
+                      <>
+                        {/* Strengths & Weaknesses */}
+                        <div className="grid md:grid-cols-2 gap-6">
+                          <div>
+                            <div className="flex items-center gap-2 mb-3">
+                              <TrendingUp className="h-4 w-4 text-green-600" />
+                              <h4 className="font-semibold text-green-700">Strengths</h4>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {result.strengths.length > 0 ? (
+                                result.strengths.map((strength: string, index: number) => (
+                                  <Badge key={index} variant="secondary" className="bg-green-100 text-green-800">
+                                    {strength}
+                                  </Badge>
+                                ))
+                              ) : (
+                                <p className="text-sm text-muted-foreground">No specific strengths identified yet</p>
+                              )}
+                            </div>
+                          </div>
 
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <TrendingDown className="h-4 w-4 text-orange-600" />
-                          <h4 className="font-semibold text-orange-700">Areas for Improvement</h4>
+                          <div>
+                            <div className="flex items-center gap-2 mb-3">
+                              <TrendingDown className="h-4 w-4 text-orange-600" />
+                              <h4 className="font-semibold text-orange-700">Areas for Improvement</h4>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {result.weaknesses.length > 0 ? (
+                                result.weaknesses.map((weakness: string, index: number) => (
+                                  <Badge key={index} variant="secondary" className="bg-orange-100 text-orange-800">
+                                    {weakness}
+                                  </Badge>
+                                ))
+                              ) : (
+                                <p className="text-sm text-muted-foreground">Great job! No major weaknesses found</p>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          {result.weaknesses.map((weakness: string, index: number) => (
-                            <Badge key={index} variant="secondary" className="bg-orange-100 text-orange-800">
-                              {weakness}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* AI Suggestions */}
-                    <div className="bg-accent/10 rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Brain className="h-4 w-4 text-primary" />
-                        <h4 className="font-semibold">AI Recommendations</h4>
-                      </div>
-                      <ul className="space-y-2">
-                        {result.recommendations.map((recommendation: string, index: number) => (
-                          <li key={index} className="flex items-start gap-2">
-                            <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
-                            <span className="text-sm">{recommendation}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                        {/* AI Suggestions */}
+                        {result.recommendations.length > 0 && (
+                          <div className="bg-accent/10 rounded-lg p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Brain className="h-4 w-4 text-primary" />
+                              <h4 className="font-semibold">AI Recommendations</h4>
+                            </div>
+                            <ul className="space-y-2">
+                              {result.recommendations.map((recommendation: string, index: number) => (
+                                <li key={index} className="flex items-start gap-2">
+                                  <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
+                                  <span className="text-sm">{recommendation}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
 
-                    {/* AI Explanation */}
-                    <div className="bg-muted/50 rounded-lg p-4">
-                      <h4 className="font-semibold mb-2">Why these suggestions?</h4>
-                      <p className="text-sm text-muted-foreground">{result.explanation}</p>
-                    </div>
+                        {/* AI Explanation */}
+                        {result.explanation && (
+                          <div className="bg-muted/50 rounded-lg p-4">
+                            <h4 className="font-semibold mb-2">Why these suggestions?</h4>
+                            <p className="text-sm text-muted-foreground">{result.explanation}</p>
+                          </div>
+                        )}
+
+                        {/* Teacher Comments */}
+                        {result.teacherComments && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Award className="h-4 w-4 text-blue-600" />
+                              <h4 className="font-semibold text-blue-900">Teacher's Feedback</h4>
+                            </div>
+                            <p className="text-sm text-blue-800">{result.teacherComments}</p>
+                          </div>
+                        )}
+                      </>
+                    )}
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
                   </CardContent>
                 </Card>
               ))}
@@ -264,6 +325,22 @@ export function StudentDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Logout Confirmation Dialog */}
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to logout?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will need to login again to access your dashboard and quiz results.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={logout}>Logout</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
