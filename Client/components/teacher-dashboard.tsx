@@ -171,7 +171,7 @@ export function TeacherDashboard() {
     // Filter to only send pending submissions
     const pendingIds = Array.from(selectedIds).filter(id => {
       const submission = submissions.find(s => s._id === id)
-      return submission?.status === "pending_review"
+      return submission?.status === "pending_review" || submission?.status === "reviewed"
     })
 
     if (pendingIds.length === 0) {
@@ -220,11 +220,11 @@ export function TeacherDashboard() {
   }
 
   const toggleSelectAll = () => {
-    const pendingSubmissions = filteredSubmissions.filter(s => s.status === "pending_review")
-    if (selectedIds.size === pendingSubmissions.length && pendingSubmissions.length > 0) {
+    const selectableSubmissions = filteredSubmissions.filter(s => s.status === "pending_review" || s.status === "reviewed")
+    if (selectedIds.size === selectableSubmissions.length && selectableSubmissions.length > 0) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(pendingSubmissions.map((s) => s._id)))
+      setSelectedIds(new Set(selectableSubmissions.map((s) => s._id)))
     }
   }
 
@@ -243,13 +243,45 @@ export function TeacherDashboard() {
     return <h1>Access Denied. Teachers only.</h1>
   }
 
-  const filteredSubmissions = submissions.filter((sub) => {
-    const matchesStatus = filterStatus === "all" || sub.status === filterStatus
-    const matchesSearch =
-      sub.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sub.userEmail.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesStatus && matchesSearch
-  })
+  const filteredSubmissions = submissions
+    .filter((sub) => {
+      const matchesStatus = filterStatus === "all" || sub.status === filterStatus
+      const matchesSearch =
+        sub.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        sub.userEmail.toLowerCase().includes(searchTerm.toLowerCase())
+      return matchesStatus && matchesSearch
+    })
+    .sort((a, b) => {
+      if (!searchTerm.trim()) return 0 // No sorting if no search term
+      
+      const search = searchTerm.toLowerCase()
+      const aName = a.userName.toLowerCase()
+      const aEmail = a.userEmail.toLowerCase()
+      const bName = b.userName.toLowerCase()
+      const bEmail = b.userEmail.toLowerCase()
+      
+      // Calculate relevance score (higher = more relevant)
+      const getScore = (name: string, email: string) => {
+        let score = 0
+        // Exact match (highest priority)
+        if (name === search || email === search) score += 1000
+        // Starts with search term
+        else if (name.startsWith(search) || email.startsWith(search)) score += 100
+        // Contains search term (already filtered, so all items have this)
+        else score += 10
+        
+        // Bonus for shorter strings (more specific match)
+        if (name.includes(search)) score += (50 - name.length)
+        if (email.includes(search)) score += (50 - email.length)
+        
+        return score
+      }
+      
+      const scoreA = getScore(aName, aEmail)
+      const scoreB = getScore(bName, bEmail)
+      
+      return scoreB - scoreA // Higher score first
+    })
 
   const pendingCount = submissions.filter((s) => s.status === "pending_review").length
   const reviewedCount = submissions.filter((s) => s.status === "reviewed").length
@@ -407,7 +439,12 @@ export function TeacherDashboard() {
                     <TableRow>
                       <TableHead className="w-12">
                         <Checkbox
-                          checked={selectedIds.size === filteredSubmissions.length && filteredSubmissions.length > 0}
+                          checked={
+                            (() => {
+                              const selectableCount = filteredSubmissions.filter(s => s.status === "pending_review" || s.status === "reviewed").length
+                              return selectableCount > 0 && selectedIds.size === selectableCount
+                            })()
+                          }
                           onCheckedChange={toggleSelectAll}
                           className="border-2 border-gray-400 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                         />
@@ -428,7 +465,7 @@ export function TeacherDashboard() {
                           <Checkbox
                             checked={selectedIds.has(submission._id)}
                             onCheckedChange={() => toggleSelection(submission._id)}
-                            disabled={submission.status !== "pending_review"}
+                            disabled={submission.status !== "pending_review" && submission.status !== "reviewed"}
                             className="border-2 border-gray-400 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                           />
                         </TableCell>

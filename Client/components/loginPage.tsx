@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Toaster } from "react-hot-toast"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "./auth-provider"
+import { useRouter } from "next/navigation"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Brain, GraduationCap, Users, TrendingUp, Eye, EyeOff } from "lucide-react"
 
@@ -31,7 +32,7 @@ export default function LoginPage() {
     department: "",
     age: "",
   })
-
+  const router = useRouter()
   const backendURL = `${process.env.NEXT_PUBLIC_API_URL}/auth` // Replace with your backend URL
 
   const validateField = (name: string, value: string) => {
@@ -40,7 +41,7 @@ export default function LoginPage() {
     switch (name) {
       case "email":
         if (!value.trim()) {
-          error = "Email is required"
+          error = "Please enter your email address"
         } else {
           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
           if (!emailRegex.test(value)) {
@@ -50,7 +51,7 @@ export default function LoginPage() {
         break
       case "password":
         if (!value) {
-          error = "Password is required"
+          error = "Please enter your password"
         } else if (value.length < 6) {
           error = "Password must be at least 6 characters long"
         }
@@ -63,7 +64,7 @@ export default function LoginPage() {
       case "name":
         if (!isLogin) {
           if (!value.trim()) {
-            error = "Name is required"
+            error = "Please enter your full name"
           } else if (value.trim().length < 2) {
             error = "Name must be at least 2 characters long"
           }
@@ -73,7 +74,7 @@ export default function LoginPage() {
         if (value) {
           const age = parseInt(value)
           if (isNaN(age) || age < 10 || age > 100) {
-            error = "Age must be between 10 and 100"
+            error = "Please enter a valid age between 10 and 100"
           }
         }
         break
@@ -184,20 +185,12 @@ export default function LoginPage() {
 
       const data = await res.json()
 
-      // localStorage.setItem("auth_token", data.access_token);
-      showSuccessToast(isLogin ? "Login successful !!!" : "Signup successful !!! Please log in.");
       if (isLogin) {
         await login(data.access_token)
-        setFormData({
-          name: "",
-          email: "",
-          password: "",
-          rollNo: "",
-          department: "",
-          age: "",
-        })
-        return;
+        showSuccessToast("Login successful !!!")
+        // Use hard redirect to ensure auth context is properly initialized
       } else {
+        showSuccessToast("Signup successful !!! Please log in.")
         setIsLogin(true);
         setFormData({
           name: "",
@@ -208,7 +201,7 @@ export default function LoginPage() {
           age: "",
         })
       }
-      // setCurrentUser(data.user);
+      
     } catch (err) {
       showErrorToast("Network error, please try again")
       console.error(err)

@@ -568,6 +568,8 @@ async def teacher_submit_bulk(
     """
     Teacher submits multiple quizzes for AI analysis and final processing
     """
+    print("Bulk submission request received for IDs:", bulk_request)
+    print("Submission IDs:", bulk_request.submissionIds)
     try:
         # Check if user is a teacher
         if current_user.get("role") != "teacher":
