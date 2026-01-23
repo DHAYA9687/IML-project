@@ -33,7 +33,7 @@ export default function LoginPage() {
     age: "",
   })
   const router = useRouter()
-  const backendURL = `${process.env.NEXT_PUBLIC_API_URL}/auth` // Replace with your backend URL
+  const backendURL = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/auth` // Replace with your backend URL
 
   const validateField = (name: string, value: string) => {
     let error = ""
@@ -201,7 +201,7 @@ export default function LoginPage() {
           age: "",
         })
       }
-      
+
     } catch (err) {
       showErrorToast("Network error, please try again")
       console.error(err)

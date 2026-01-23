@@ -156,7 +156,7 @@ def predict_student_risk(quiz_submission: Dict[str, Any]) -> Dict[str, Any]:
         }
     """
     # Load or initialize model (in production, load your trained model)
-    # model = pickle.load(open("model.pkl", "rb"))
+    model = pickle.load(open("model.pkl", "rb"))
     model = MockMLModel()
     
     # Extract features

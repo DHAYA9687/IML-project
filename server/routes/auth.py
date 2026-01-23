@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from fastapi.security import OAuth2PasswordBearer
-from passlib.context import CryptContext
+import bcrypt
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 import uuid
@@ -17,7 +17,6 @@ load_dotenv()
 SECRET_KEY = os.getenv("JWT_SECRET")
 ALGORITHM = os.getenv("ALGORITHM")
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class UserBase(BaseModel):
@@ -44,11 +43,11 @@ class UserOut(UserBase):
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
 
 @auth_router.post("/signup", response_model=UserOut)

@@ -1,5 +1,5 @@
 {
-  "/student-dashboard/page": "app/student-dashboard/page.js",
+  "/page": "app/page.js",
   "/teacher-dashboard/page": "app/teacher-dashboard/page.js",
-  "/page": "app/page.js"
+  "/student-dashboard/page": "app/student-dashboard/page.js"
 }

@@ -1,5 +1,6 @@
 from fastapi import Depends, HTTPException, Request, status
-from jose import JWTError, jwt
+import jwt
+from jwt import PyJWTError
 import os
 from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
@@ -36,7 +37,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
             "department": department,
             "age": age,
         }
-    except JWTError:
+    except PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
